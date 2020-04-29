@@ -1,7 +1,13 @@
 apiVersion: just.learning.io.just.learning.io/v1beta1
 kind: TelegramMessage
 metadata:
-  name: telegrammessage-sample
+  generation: 1
+  labels:
+    controller-tools.k8s.io: "1.0"
+  name: test
+  namespace: default
 spec:
-  # Add fields here
-  foo: bar
+  messagetodeliver: "Hello, Coder!"
+  token: "<your-bot-token>"
+  chatid: "<your-chat-id>"
+status: {}
