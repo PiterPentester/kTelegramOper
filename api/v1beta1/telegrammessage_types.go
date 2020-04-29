@@ -20,27 +20,24 @@ import (
 	metav1 "k8s.io/apimachinery/pkg/apis/meta/v1"
 )
 
-// EDIT THIS FILE!  THIS IS SCAFFOLDING FOR YOU TO OWN!
-// NOTE: json tags are required.  Any new fields you add must have json tags for the fields to be serialized.
-
 // TelegramMessageSpec defines the desired state of TelegramMessage
 type TelegramMessageSpec struct {
-	// INSERT ADDITIONAL SPEC FIELDS - desired state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
-
-	// Foo is an example field of TelegramMessage. Edit TelegramMessage_types.go to remove/update
-	Foo string `json:"foo,omitempty"`
+	MessageToDeliver string `json:"messagetodeliver,omitempty"`
+	Token            string `json:"token,omitempty"`
+	ChatID           string `json:"chatid,omitempty"`
 }
 
 // TelegramMessageStatus defines the observed state of TelegramMessage
 type TelegramMessageStatus struct {
-	// INSERT ADDITIONAL STATUS FIELD - define observed state of cluster
-	// Important: Run "make" to regenerate code after modifying this file
+	Delivered        string `json:"delivered,omitempty"`
+	MessageDelivered string `json:"messagedelivered,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// +genclient
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TelegramMessage is the Schema for the telegrammessages API
+// +k8s:openapi-gen=true
 type TelegramMessage struct {
 	metav1.TypeMeta   `json:",inline"`
 	metav1.ObjectMeta `json:"metadata,omitempty"`
@@ -49,7 +46,7 @@ type TelegramMessage struct {
 	Status TelegramMessageStatus `json:"status,omitempty"`
 }
 
-// +kubebuilder:object:root=true
+// +k8s:deepcopy-gen:interfaces=k8s.io/apimachinery/pkg/runtime.Object
 
 // TelegramMessageList contains a list of TelegramMessage
 type TelegramMessageList struct {
@@ -59,5 +56,6 @@ type TelegramMessageList struct {
 }
 
 func init() {
+
 	SchemeBuilder.Register(&TelegramMessage{}, &TelegramMessageList{})
 }

@@ -18,36 +18,104 @@ package controllers
 
 import (
 	"context"
+	"log"
+	"net/http"
+	"net/url"
 
-	"github.com/go-logr/logr"
 	"k8s.io/apimachinery/pkg/runtime"
-	ctrl "sigs.k8s.io/controller-runtime"
 	"sigs.k8s.io/controller-runtime/pkg/client"
 
 	justlearningiov1beta1 "just.learning.io/api/v1beta1"
+	"k8s.io/apimachinery/pkg/api/errors"
+
+	"sigs.k8s.io/controller-runtime/pkg/controller"
+	"sigs.k8s.io/controller-runtime/pkg/handler"
+	"sigs.k8s.io/controller-runtime/pkg/manager"
+	"sigs.k8s.io/controller-runtime/pkg/reconcile"
+	"sigs.k8s.io/controller-runtime/pkg/source"
 )
 
-// TelegramMessageReconciler reconciles a TelegramMessage object
-type TelegramMessageReconciler struct {
+// Add creates a new TelegramMessage Controller and adds it to the Manager with default RBAC. The Manager will set fields on the Controller
+func Add(mgr manager.Manager) error {
+	return add(mgr, newReconciler(mgr))
+}
+
+// newReconciler returns a new reconcile.Reconciler
+func newReconciler(mgr manager.Manager) reconcile.Reconciler {
+	return &ReconcileTelegramMessage{Client: mgr.GetClient(), scheme: mgr.GetScheme()}
+}
+
+// add adds a new Controller to mgr with r as the reconcile.Reconciler
+func add(mgr manager.Manager, r reconcile.Reconciler) error {
+	// Create a new controller
+	c, err := controller.New("telegrammessage-controller", mgr, controller.Options{Reconciler: r})
+	if err != nil {
+		return err
+	}
+
+	// Watch for changes to TelegramMessage
+	err = c.Watch(&source.Kind{Type: &justlearningiov1beta1.TelegramMessage{}}, &handler.EnqueueRequestForObject{})
+	if err != nil {
+		return err
+	}
+
+	// Uncomment watch a Deployment created by TelegramMessage - change this for objects you create
+	err = c.Watch(&source.Kind{Type: &justlearningiov1beta1.TelegramMessage{}}, &handler.EnqueueRequestForOwner{
+		IsController: true,
+		OwnerType:    &justlearningiov1beta1.TelegramMessage{},
+	})
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+var _ reconcile.Reconciler = &ReconcileTelegramMessage{}
+
+// ReconcileTelegramMessage reconciles a TelegramMessage object
+type ReconcileTelegramMessage struct {
 	client.Client
-	Log    logr.Logger
-	Scheme *runtime.Scheme
+	scheme *runtime.Scheme
 }
 
-// +kubebuilder:rbac:groups=just.learning.io.just.learning.io,resources=telegrammessages,verbs=get;list;watch;create;update;patch;delete
-// +kubebuilder:rbac:groups=just.learning.io.just.learning.io,resources=telegrammessages/status,verbs=get;update;patch
+// Reconcile reads that state of the cluster for a TelegramMessage object and makes changes based on the state read
+// and what is in the TelegramMessage.Spec
+// Automatically generate RBAC rules to allow the Controller to read and write Deployments
+// +kubebuilder:rbac:groups=apps,resources=deployments,verbs=get;list;watch;create;update;patch;delete
+// +kubebuilder:rbac:groups=justlearningiov1beta1,resources=telegrammessages,verbs=get;list;watch;create;update;patch;delete
+func (r *ReconcileTelegramMessage) Reconcile(request reconcile.Request) (reconcile.Result, error) {
 
-func (r *TelegramMessageReconciler) Reconcile(req ctrl.Request) (ctrl.Result, error) {
-	_ = context.Background()
-	_ = r.Log.WithValues("telegrammessage", req.NamespacedName)
+	// Fetch the TelegramMessage instance
+	instance := &justlearningiov1beta1.TelegramMessage{}
+	err := r.Get(context.TODO(), request.NamespacedName, instance)
+	if err != nil {
+		if errors.IsNotFound(err) {
+			// Object not found, return.  Created objects are automatically garbage collected.
+			return reconcile.Result{}, nil
+		}
+		// Error reading the object - requeue the request.
+		return reconcile.Result{}, err
+	}
+	log.Printf("Checking status of resource %s", instance.Name)
 
-	// your logic here
-
-	return ctrl.Result{}, nil
-}
-
-func (r *TelegramMessageReconciler) SetupWithManager(mgr ctrl.Manager) error {
-	return ctrl.NewControllerManagedBy(mgr).
-		For(&justlearningiov1beta1.TelegramMessage{}).
-		Complete(r)
+	if instance.Status.Delivered != "Yes" || instance.Status.MessageDelivered != instance.Spec.MessageToDeliver {
+		log.Printf("Sending message %s\n", instance.Spec.MessageToDeliver)
+		resp, err := http.Post("https://api.telegram.org/bot"+instance.Spec.Token+"/sendMessage?chat_id="+instance.Spec.ChatID+"&text="+url.QueryEscape(instance.Spec.MessageToDeliver), "", nil)
+		if err != nil {
+			log.Printf("Please doublecheck token and chatId, %s", err)
+			instance.Status.Delivered = "No"
+			instance.Status.MessageDelivered = "ERROR NO MESSAGE SENT"
+		} else {
+			instance.Status.Delivered = "Yes"
+			instance.Status.MessageDelivered = instance.Spec.MessageToDeliver
+		}
+		defer resp.Body.Close()
+		err = r.Update(context.TODO(), instance)
+		if err != nil {
+			log.Printf("%s\n", err)
+			return reconcile.Result{}, err
+		}
+	}
+	return reconcile.Result{}, nil
 }
