@@ -1,0 +1,7 @@
+apiVersion: just.learning.io.just.learning.io/v1beta1
+kind: TelegramMessage
+metadata:
+  name: telegrammessage-sample
+spec:
+  # Add fields here
+  foo: bar

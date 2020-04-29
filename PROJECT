@@ -1,3 +1,7 @@
 domain: just.learning.io
 repo: just.learning.io
+resources:
+- group: just.learning.io
+  kind: TelegramMessage
+  version: v1beta1
 version: "2"
